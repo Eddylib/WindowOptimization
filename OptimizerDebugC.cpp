@@ -1,20 +1,13 @@
 //
-// Created by libaoyu on 18-10-31.
+// Created by libaoyu on 19-1-21.
 //
 
-#include "window_optimization.h"
-#include <random>
-#include <memory>
-#include <iostream>
-#include <eigen3/unsupported/Eigen/MatrixFunctions>
-#include "../utils.h"
+#include "OptimizerDebugC.h"
+#include "src/backend/Camera.h"
+#include "src/backend/Point.h"
+#include "src/backend/Residual.h"
+#include "src/debug_utils.h"
 
-#include "Camera.h"
-#include "Point.h"
-#include "Residual.h"
-void OptimizerDebugC::reset() {
-    init(0,0);
-}
 int get_rand(size_t max,int nodiff = -1){
     int ret = static_cast<int>(rand() % max);
     if(nodiff >= 0){
@@ -25,7 +18,7 @@ int get_rand(size_t max,int nodiff = -1){
     return ret;
 }
 void OptimizerDebugC::init(int camNum, int resNum) {
-    srand(100);
+    srand(11);
     for (int i = 0; i < camNum; ++i) {
         cameras.push_back(new Camera(i));
     }
@@ -53,13 +46,22 @@ void OptimizerDebugC::init(int camNum, int resNum) {
         }
     }
     // 整合相机信息到B中
+#if 0
+    cout<<__FUNCTION__<<endl;
+    auto oldB = B;
+    cout<<"-------------------"<<endl;
+    cout<<oldB<<endl;
     attach_B();
+    cout<<"-------------------"<<endl;
+    cout<<B<<endl;
+    cout<<"-------------------"<<endl;
+    cout<<B-oldB<<endl;
+#endif
 }
 
-Residual *OptimizerDebugC::newResidual(Camera *host, Camera *target, float possibilityCreateNewPoint) {
+void OptimizerDebugC::newResidual(Camera *host, Camera *target, float possibilityCreateNewPoint) {
     Point *point = nullptr;
     int ifcreate = float(rand()%100)/100.f > (1.f-possibilityCreateNewPoint);
-    float tmp = float(rand()%100)/100.f;
 //    cout<<ifcreate<<endl;
     // host没点，必然要新建点，possibilityCreateNewPoint新建点
     if(host->getPoints().empty() || ifcreate){
@@ -69,17 +71,14 @@ Residual *OptimizerDebugC::newResidual(Camera *host, Camera *target, float possi
     // 如果找不到，才新建点
     if(!point){
         Point *tmp = nullptr;
-        if(!target->getPoints().empty()){
-            int ptIdx = get_rand(target->getPoints().size());
-            tmp = target->getPoints()[ptIdx];
-        }
-        if(!tmp || tmp->hasResidualWithTarget(host->getid())){
+        int ptIdx = get_rand(host->getPoints().size());
+        tmp = host->getPoints()[ptIdx];
+        if(!tmp || tmp->hasResidualWithTarget(target->getid())){
             tmp = host->newPoint();
         }
         point = tmp;
     }
-    Residual *residual = new Residual(host,target,point);
-    return residual;
+    addResidual(host,target,point);
 }
 
 void OptimizerDebugC::printInfo() {
@@ -134,7 +133,6 @@ void OptimizerDebugC::fetchInfo(int *camNum, int *pointNum, int *resNum) {
         *resNum = resCnt;
     }
 }
-
 Mat OptimizerDebugC::generateVCam() {
     // V: -J*r
     int resCnt = 0;
@@ -201,7 +199,7 @@ Mat OptimizerDebugC::generateTotalV() {
 Mat OptimizerDebugC::generateTotalH() {
     auto J = generateTotalJ();
     auto ret =J.transpose()*J;
-    vector<Point *> allPoints = getAllPoints();
+//    vector<Point *> allPoints = getAllPoints();
 #ifdef DEBUG
     cout<<__FUNCTION__<<", E"<<endl;
     cout<<ret.block(0,cameras.size()*FRAME_DIM,cameras.size()*FRAME_DIM,allPoints.size()*POINT_DIM)<<endl;
@@ -234,155 +232,8 @@ vector<Point *> OptimizerDebugC::getAllPoints() {
     return ret;
 }
 
-void WindowOptimizor::attach_B() {
-    B.setIdentity();
-    accB.setIdentity();
-    B.block(0,0,cameras.size()*FRAME_DIM,cameras.size()*FRAME_DIM).setZero();
-    accB.block(0,0,cameras.size()*FRAME_DIM,cameras.size()*FRAME_DIM).setZero();
-    for (int i = 0; i < cameras.size(); ++i) {
-        auto &points = cameras[i]->getPoints();
-        for (int j = 0; j < points.size(); ++j) {
-            auto &reses = points[j]->getResiduals();
-            for (int k = 0; k < reses.size(); ++k) {
-                Residual *res = reses[k];
-                int sth,stt;
-                sth = FRAME_DIM*res->host->getid();
-                stt = FRAME_DIM*res->target->getid();
-
-                Mat accBTH = res->jdrdxi_th.transpose()*res->jdrdxi_th;
-
-                accB.block<FRAME_DIM,FRAME_DIM>(sth,sth) += accBTH;
-
-                B.block<FRAME_DIM,FRAME_DIM>(sth,sth) +=
-                        res->getAdjH().transpose() *accBTH*res->getAdjH();
-
-                B.block<FRAME_DIM,FRAME_DIM>(stt,stt) += /*I*/accBTH/*I*/;
-
-                B.block<FRAME_DIM,FRAME_DIM>(sth,stt) += res->getAdjH().transpose() *accBTH;/*I*/
-
-                B.block<FRAME_DIM,FRAME_DIM>(stt,sth) += /*I*/accBTH *res->getAdjH();
-            }
-        }
-    }
-//    cout<<accB<<endl;
-}
-
-void WindowOptimizor::insertCamera(Camera *camera) {
-    if(cameras.size() >= WINDOW_SIZE_MAX){
-        cout<<__FUNCTION__<<", error reach max window size"<<endl;
-        return;
-    }
-    cameras.push_back(camera);
-}
-
-//进行一次优化迭代，假定B已存在，任务： 将delta求解出（cameras，points里面都有）
-//必然要更新B，更新JxR，ECinvw，
-//如果要求点的更新量，EdertaXx要求出，点的derta会被更新
-void
-WindowOptimizor::step_once(
-        Mat &delta,
-        bool if_process_camera,
-        bool if_process_points,
-        bool if_update_camera,
-        bool if_update_points) {
-    if(if_process_camera){
-        //只计算相机更新量
-        Hxixi Bupdate = Hxixi::Zero();
-        int camSize = static_cast<int>(cameras.size());
-        for (int i = 0; i < camSize; ++i) {
-            cameras[i]->einvCJpR.setZero();
-            cameras[i]->jx_r.setZero();
-        }
-        int cntE = 0;
-        for (int i = 0; i < camSize; ++i) {
-            Camera *camera = cameras[i];
-            for (int j = 0; j < camera->getPoints().size(); ++j) {
-                Point *point = camera->getPoints()[j];
-                point->jp_r.setZero();
-            }
-            for (int j = 0; j < camera->getPoints().size(); ++j) {
-                Point *point = camera->getPoints()[j];
-                //对每个点，统计信息到B
-                for (int k = 0; k < camSize; ++k) {
-                    for (int l = 0; l < camSize; ++l) {
-                        int str,stc;
-                        str = k*FRAME_DIM;
-                        stc = l*FRAME_DIM;
-                        Bupdate.block<FRAME_DIM,FRAME_DIM>(str,stc)+=
-                                (*point->Eik[k])*point->C.inverse()*point->Eik[l]->transpose();
-                    }
-                }
-
-                //对每个残差项
-                //统计 sum{Eik * Ckk.inverse * Jx * r}，注意Jx为绝对坐标，包含了adjoint
-                for (int k = 0; k < point->getResiduals().size(); ++k) {
-                    Residual *res = point->getResiduals()[k];
-                    res->host->jx_r -= res->jthAdjH_r;
-                    res->target->jx_r -= res->jthAdjT_r;
-                    point->jp_r += res->jp_r;
-                }
-                //jp_r应该乘以-1，所以这里变成了减等
-                // 每个点对每个相机都有贡献！！
-                for (int k = 0; k < camSize; ++k) {
-                    cameras[k]->einvCJpR -= (*point->Eik[k])
-                                        *point->C.inverse()*point->jp_r;
-                }
-
-//                cout<<__FUNCTION__<<","<<cntE++<<","<<(*point->Eik[i]).transpose()<<endl;
-            }
-        }
-        Eigen::Matrix<SCALAR,WINDOW_SIZE_MAX*FRAME_DIM,1> optRight =
-                Eigen::Matrix<SCALAR,WINDOW_SIZE_MAX*FRAME_DIM,1>::Ones();
-#if 0
-        int cnt = 0;
-        Eigen::Matrix<SCALAR,WINDOW_SIZE_MAX*FRAME_DIM,1> VCam =
-                Eigen::Matrix<SCALAR,WINDOW_SIZE_MAX*FRAME_DIM,1>::Ones();
-        Eigen::Matrix<SCALAR,WINDOW_SIZE_MAX*FRAME_DIM,1> EcinvP =
-                Eigen::Matrix<SCALAR,WINDOW_SIZE_MAX*FRAME_DIM,1>::Ones();
-#endif
-        //Bnew now is B, finished update
-//        cout<<__FUNCTION__<<endl;
-//        cout<<B<<endl;
-
-        for (int i = 0; i < camSize; ++i) {
-            optRight.segment<FRAME_DIM>(i*FRAME_DIM) = cameras[i]->jx_r-cameras[i]->einvCJpR;
-#if 0
-            VCam.segment<FRAME_DIM>(i*FRAME_DIM) = cameras[i]->jx_r;
-            EcinvP.segment<FRAME_DIM>(i*FRAME_DIM) = cameras[i]->einvCJpR;
-            cnt+=cameras[i]->getPoints().size();
-#endif
-        }
-        delta = (B-Bupdate).colPivHouseholderQr().solve(optRight);
-#if 0
-        cout<<__FUNCTION__<<" Vcam"<<endl;
-        cout<<VCam<<endl;
-        cout<<__FUNCTION__<<" EcinvP"<<endl;
-        cout<<EcinvP<<endl;
-        Mat PointV;
-        PointV.resize(cnt*POINT_DIM,1);
-        int k = 0;
-        for (int i = 0; i < camSize; ++i) {
-            for (int j = 0; j < cameras[i]->getPoints().size(); ++j) {
-                PointV.block(k*POINT_DIM,0,POINT_DIM,1) = cameras[i]->getPoints()[j]->jp_r;
-                k++;
-            }
-        }
-        cout<<__FUNCTION__<<" pointV"<<endl;
-        cout<<PointV<<endl;
-        cout<<__FUNCTION__<<" End"<<endl;
-#endif
-        if(if_update_camera){
-            //改变相机状态
-            B-=Bupdate;
-        }
-        //同时计算点的更新量
-        if(if_process_points){
-            if(if_update_points){
-
-            }
-        }
-    }
-
+void OptimizerDebugC::reset() {
+    init(0,0);
 }
 
 Mat OptimizerDebugC::genBUpdate() {
@@ -512,6 +363,7 @@ Mat OptimizerDebugC::generateTotalR() {
 Mat OptimizerDebugC::generateCamUpdate() {
 //    Mat update = genBUpdate();
     Mat bNew = get_B() - genBUpdate();
+
     Mat eCinvVPoint = genE_CInv_VPoint(generateVPoint());
 #if 0
     cout<<__FUNCTION__<<"Vcam"<<endl;
@@ -525,8 +377,6 @@ Mat OptimizerDebugC::generateCamUpdate() {
     Mat xMargSolveCam = bNew.bdcSvd(Eigen::ComputeThinU|Eigen::ComputeThinV).solve(generateVCam()-eCinvVPoint);
     return xMargSolveCam;
 }
-
-
 
 void test_init(OptimizerDebugC &system){
 
@@ -546,19 +396,10 @@ void test_init(OptimizerDebugC &system){
     Mat B = system.get_B();
 
 #endif
+
+
+    cout<<"************************************************************************************"<<endl;
     timeval t[2];
-    start(t);
-    auto margsolve =system.generateCamUpdate();
-    stop(t);
-    cout<<"marg solve calculate duration: "<<duration(t)<<"ms"<<endl;
-
-    Mat delta;
-    start(t);
-    system.step_once(delta);
-    stop(t);
-    cout<<"split marg calculate duration: "<<duration(t)<<"ms"<<endl;
-
-
     cout<<"testing now>>"<<__FUNCTION__<<endl;
     Mat tth = system.generateTotalH();
     Mat ttv = system.generateTotalV();
@@ -567,6 +408,18 @@ void test_init(OptimizerDebugC &system){
     stop(t);
     Mat xDirectSolveCam = xDirectSolve.block(0,0,FRAME_DIM*system.getCameras().size(),1);
     cout<<"direct solve calculate duration: "<<duration(t)<<"ms"<<endl;
+
+    start(t);
+    auto margsolve =system.generateCamUpdate();
+    stop(t);
+    cout<<"marg solve calculate duration: "<<duration(t)<<"ms"<<endl;
+
+    Mat delta;
+    start(t);
+    system.clearMargedPoints();
+    system.step_once(delta);
+    stop(t);
+    cout<<"split marg calculate duration: "<<duration(t)<<"ms"<<endl;
 
     cout<<"*********************"<<__FUNCTION__<<" errors in direct and marg sove: rows, cols, rmse: "<<endl;
     Mat error = xDirectSolveCam - margsolve;
@@ -582,4 +435,20 @@ void test_init(OptimizerDebugC &system){
 
 void test_add_camera(OptimizerDebugC &system){
     system.insertCamera(new Camera(static_cast<int>(system.getCameras().size())));
+}
+
+void test_marg_point(OptimizerDebugC &system, float possibility) {
+    assert(possibility < 1);
+    vector<Camera *> &cameras = system.getCameras();
+    int camSize = cameras.size();
+    for (int i = 0; i < camSize; ++i) {
+        if(cameras[i]->getPoints().size() <= 1) continue;
+        for (int j = 0; j < cameras[i]->getPoints().size(); ++j) {
+            int ifmarg = float(rand()%100)/100.f>(1.f-possibility);
+            if(ifmarg){
+                cameras[i]->getPoints()[j]->state = State::TOBE_MARGINLIZE;
+            }
+        }
+    }
+    system.marginlizeFlaggedPoint();
 }

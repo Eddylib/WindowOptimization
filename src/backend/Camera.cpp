@@ -6,6 +6,12 @@
 #include "Point.h"
 #include "Residual.h"
 #include <eigen3/unsupported/Eigen/MatrixFunctions>
+
+Camera::Camera(int _id):id(_id),state(DataGenerator::gen_data<CamState>()){
+    einvCJpR.setZero();
+    jx_r.setZero();
+    einvCJpRMargedP.setZero();
+}
 Point *Camera::newPoint() {
     Point *ret = new Point(static_cast<int>(points.size()), this);
     points.push_back(ret);

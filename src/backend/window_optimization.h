@@ -54,51 +54,45 @@
 using namespace std;
 //#define DEBUG
 
-#include "types.h"
+#include "../alg_config.h"
+#include "../alg_utils.h"
+#include "../debug_utils.h"
 class Camera;
 class Point;
 class Residual;
 
 class WindowOptimizor{
 protected:
-    Hxixi B;// 位姿部分的hession矩阵维护在B中，此矩阵是jdrdx^T*jdrdx
+    Hxixi B;
     Hxixi accB;// 位姿部分的hession矩阵维护在B中，此矩阵是jdrdx_{ij}^T*jdrdx_{ij}
     //上面两个矩阵的关系是一个仅对相对位姿求导（accB，对应于DSO中的EF什么什么中的acc）
     // 一个是绝对位姿（B对应于DSO中的EF什么什么中的Hm），相对位姿用于跟踪，绝对位姿用于建图
+
+    //由于点被marg而导致的信息增值
+    Hxixi BMargedP;
     vector<Camera *> cameras;
+    int bIsIdentity[WINDOW_SIZE_MAX];
+    void beginMargPoint();
+    void endMarg();
+    void marginlizeOnePoint(Point *point);
 public:
+    WindowOptimizor();
     void attach_B();    //B 只有在第一次运算时才会调用此函数将所有数据加载到B上，之后只需进行优化来更新B
-    const vector<Camera *>& getCameras(){return cameras;}
+    vector<Camera *> & getCameras(){return cameras;}
     void insertCamera(Camera *camera);
+    void insertPoint(Point *point);
     void step_once(
             Mat &delta,
             bool if_process_camera = true,
             bool if_process_points = false,
             bool if_update_camera = false,
             bool if_update_points = false);
+    //marg掉一个点如何才算成功？ marg前后算位姿数据不变，这才说明信息被合理地添加到了相应的地方。
+    void addResidual(Camera *_host, Camera *_target, Point *_point);
+    // 外部代码只需要标记某个point为可marg，然后调用marginlizeFlaggedPoint即可marg掉点
+    //之后需要调用clearMargedPoints来彻底删除marg掉的点。
+    void marginlizeFlaggedPoint();
+    void clearMargedPoints();
+    void marginlizeOneCamera(Camera *camera);
 };
-
-class OptimizerDebugC: public WindowOptimizor{
-public:
-    Mat generateCamUpdate();
-    Mat generateTotalH();
-    Mat generateTotalV();
-    Mat generateTotalJ();
-    Mat generateTotalR();
-    Mat generateVCam();
-    Mat generateVPoint();
-    void reset();
-    void init(int camNum, int resNum);
-    Residual *newResidual(Camera *host, Camera *target, float possibilityCreateNewPoint = 0.3);
-    const Mat get_B(){return B.block(0,0,cameras.size()*FRAME_DIM,cameras.size()*FRAME_DIM);}
-    vector<Point*> getAllPoints();
-    vector<Residual*> getAllResiduals();
-    Mat genBUpdate();
-    Mat genE_CInv_VPoint(const Mat &vPoint);
-    void printInfo();
-    void fetchInfo(int *camNum = nullptr,int *pointNum = nullptr, int *resNum = nullptr);
-};
-void test_init(OptimizerDebugC &system);
-
-void test_add_camera(OptimizerDebugC &system);
 #endif //WINDOWOPTIMIZATION_WINDOW_OPTIMIZATION_H

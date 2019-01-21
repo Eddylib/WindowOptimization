@@ -6,8 +6,8 @@
 #define WINDOWOPTIMIZATION_RESIDUAL_H
 
 #include <iostream>
-#include "debug_utils.h"
-#include "types.h"
+#include "../debug_utils.h"
+#include "../alg_config.h"
 class Camera;
 class Residual;
 class Point;
@@ -16,6 +16,7 @@ public:
     Camera *host;
     Camera *target;
     Point *point;
+    Residual(Camera *_host,Camera *_target,Point *_point,Eigen::Matrix<SCALAR,RES_DIM,1>);
     Residual(Camera *_host,Camera *_target,Point *_point);
     Jdrdp_t jdrdp;
     Jdrdxi_t jdrdxi_th; //相对位姿

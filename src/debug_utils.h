@@ -5,7 +5,13 @@
 #ifndef WINDOWOPTIMIZATION_DEBUG_UTILS_H
 #define WINDOWOPTIMIZATION_DEBUG_UTILS_H
 
-#include "types.h"
+#include <opencv2/core/hal/interface.h>
+#include "alg_config.h"
+#include "alg_utils.h"
+#include <time.h>
+#include <sys/time.h>
+#define  dbcout cout<<__FILE__<<","<<__FUNCTION__<<","<<__LINE__<<": "
+
 class DataGenerator{
 public:
     template <typename T>
@@ -36,4 +42,35 @@ public:
     }
 };
 
+inline std::string type2str(int type) {
+    std::string r;
+
+    uchar depth = type & CV_MAT_DEPTH_MASK;
+    uchar chans = 1 + (type >> CV_CN_SHIFT);
+
+    switch ( depth ) {
+        case CV_8U:  r = "8U"; break;
+        case CV_8S:  r = "8S"; break;
+        case CV_16U: r = "16U"; break;
+        case CV_16S: r = "16S"; break;
+        case CV_32S: r = "32S"; break;
+        case CV_32F: r = "32F"; break;
+        case CV_64F: r = "64F"; break;
+        default:     r = "User"; break;
+    }
+
+    r += "C";
+    r += (chans+'0');
+
+    return r;
+}
+inline void start(timeval  *time){
+    gettimeofday(time, NULL);
+}
+inline void stop(timeval  *time){
+    gettimeofday(time+1, NULL);
+}
+inline long long duration(timeval  *time){
+    return (time[1].tv_sec - time[0].tv_sec)*1000+(time[1].tv_usec - time[0].tv_usec)/1000;
+}
 #endif //WINDOWOPTIMIZATION_DEBUG_UTILS_H

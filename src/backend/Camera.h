@@ -7,8 +7,8 @@
 
 
 #include <vector>
-#include "types.h"
-#include "debug_utils.h"
+#include "../alg_config.h"
+#include "../debug_utils.h"
 class Camera;
 class Residual;
 class Point;
@@ -17,7 +17,7 @@ class Camera{
     std::vector<Point*> points;
 
 public:
-    Camera(int _id):id(_id),state(DataGenerator::gen_data<CamState>()){}
+    Camera(int _id);
     Point *newPoint();
     std::vector<Point*> &getPoints(){return points;}
     int getid(){ return id;}
@@ -28,6 +28,8 @@ public:
     // use only when optimize,各个相机的right加起来构成了优化式子的右边
     Eigen::Matrix<SCALAR,FRAME_DIM,1> jx_r;
     Eigen::Matrix<SCALAR,FRAME_DIM,1> einvCJpR;
+    //point被margin掉而导致的信息增值
+    Eigen::Matrix<SCALAR,FRAME_DIM,1> einvCJpRMargedP;
 
     Eigen::Matrix<SCALAR,FRAME_DIM,1> prior_h;
     CamState state;

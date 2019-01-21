@@ -3,10 +3,12 @@
 //
 #include <iostream>
 #include <eigen3/Eigen/Dense>
-#include "src/window_optimization.h"
+#include "src/backend/window_optimization.h"
 #include <eigen3/unsupported/Eigen/MatrixFunctions>
+#include <bitset>
 #include "utils.h"
-    class Accumulator11
+#include "src/alg_utils.h"
+class Accumulator11
 {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
@@ -89,7 +91,7 @@ private:
     }
 };
 using namespace std;
-int main(){
+int testacc(){
     Accumulator11 a;
     float update = 100000000;
     int times = 10000;
@@ -115,4 +117,29 @@ int main(){
     }
     stop(t);
     cout<<"direct add  result: "<<data<<" , cost: "<<duration(t)<<" ms"<<endl;
+}
+template <typename T,typename TB>
+void print_2(T &&a,TB &&b){
+    cout<<a<<", "<<b<<endl;
+}
+template <typename T>
+void print_2(T && a){
+    cout<<a<<endl;
+}
+
+template <typename T,typename T2, typename... Args>
+void print_2(T &&a,T2 &&b,Args&&... rest){
+    cout<<a<<", "<<b<<", "<<endl;
+    cout<<sizeof...(Args)<<endl;
+    cout<<sizeof...(rest)<<endl;
+    print_2(std::forward<Args>(rest)...);
+//    print_2(std::forward<Args>(rest)...);
+    a=3;
+
+}
+int main(){
+    unsigned long long a =0x113;
+    std::bitset<10> b(string("babaaaabbb"),0,string::npos,'a','b');
+    b[0] = false;
+    cout<<b<<endl;
 }
