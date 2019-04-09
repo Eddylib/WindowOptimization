@@ -138,8 +138,8 @@ void print_2(T &&a,T2 &&b,Args&&... rest){
 
 }
 int main(){
-    unsigned long long a =0x113;
-    std::bitset<10> b(string("babaaaabbb"),0,string::npos,'a','b');
-    b[0] = false;
-    cout<<b<<endl;
+   Eigen::MatrixXf a = Eigen::MatrixXf();
+    a.resize(3,3);
+   a<<1,1,1,1,1,1,1,1,1;
+    cout<<a.exp()<<endl;
 }

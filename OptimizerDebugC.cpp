@@ -20,7 +20,7 @@ int get_rand(size_t max,int nodiff = -1){
 void OptimizerDebugC::init(int camNum, int resNum) {
     srand(11);
     for (int i = 0; i < camNum; ++i) {
-        cameras.push_back(new Camera(i));
+        cameras.push_back(new Camera_t(i));
     }
     vector<int> camSeleted(cameras.size(),0);
     for (int i = 0; i < resNum; ++i) {
@@ -28,8 +28,8 @@ void OptimizerDebugC::init(int camNum, int resNum) {
         int hostCamSelected = get_rand(cameras.size());
         int targetCamSelected = get_rand(cameras.size(),hostCamSelected);
 
-        Camera *host = cameras[hostCamSelected];
-        Camera *target = cameras[targetCamSelected];
+        Camera_t *host = cameras[hostCamSelected];
+        Camera_t *target = cameras[targetCamSelected];
         newResidual(host,target);
         camSeleted[hostCamSelected] = 1;
     }
@@ -39,8 +39,8 @@ void OptimizerDebugC::init(int camNum, int resNum) {
             int hostCamSelected = i;
             int targetCamSelected = get_rand(cameras.size(),hostCamSelected);
 
-            Camera *host = cameras[hostCamSelected];
-            Camera *target = cameras[targetCamSelected];
+            Camera_t *host = cameras[hostCamSelected];
+            Camera_t *target = cameras[targetCamSelected];
             newResidual(host,target);
             camSeleted[i] = 1;
         }
@@ -59,18 +59,18 @@ void OptimizerDebugC::init(int camNum, int resNum) {
 #endif
 }
 
-void OptimizerDebugC::newResidual(Camera *host, Camera *target, float possibilityCreateNewPoint) {
-    Point *point = nullptr;
-    int ifcreate = float(rand()%100)/100.f > (1.f-possibilityCreateNewPoint);
+void OptimizerDebugC::newResidual(Camera_t *host, Camera_t *target, float possibilityCreateNewPoint_t) {
+    Point_t *point = nullptr;
+    int ifcreate = float(rand()%100)/100.f > (1.f-possibilityCreateNewPoint_t);
 //    cout<<ifcreate<<endl;
-    // host没点，必然要新建点，possibilityCreateNewPoint新建点
+    // host没点，必然要新建点，possibilityCreateNewPoint_t新建点
     if(host->getPoints().empty() || ifcreate){
         point = host->newPoint();
     }
     // 如果没有新建点，则在host里选择一个点，如果选的点与target和host已经有联系，则再选则其他的与host无联系的点
     // 如果找不到，才新建点
     if(!point){
-        Point *tmp = nullptr;
+        Point_t *tmp = nullptr;
         int ptIdx = get_rand(host->getPoints().size());
         tmp = host->getPoints()[ptIdx];
         if(!tmp || tmp->hasResidualWithTarget(target->getid())){
@@ -78,7 +78,7 @@ void OptimizerDebugC::newResidual(Camera *host, Camera *target, float possibilit
         }
         point = tmp;
     }
-    addResidual(host,target,point);
+    Base_t::addResidual(host,target,point);
 }
 
 void OptimizerDebugC::printInfo() {
@@ -89,20 +89,20 @@ void OptimizerDebugC::printInfo() {
     cout<<"camera num: "<<cameraCnt<<"\npoint num: "<<pointCnt<<"\nresidual num: "<<resCnt<<"*2"<<endl;
 //    for (int i = 0; i < cameras.size(); ++i) {
 //        cout<<"******************************"<<endl;
-//        Camera *camera = cameras[i];
-//        cout<<"camera: "<<camera->getid()<<" has "<<camera->getPoints().size()<<" points"<<endl;
-//        for (int j = 0; j < camera->getPoints().size(); ++j) {
-//            Point *point = camera->getPoints()[j];
+//        Camera_t *camera = cameras[i];
+//        cout<<"camera: "<<camera->getid()<<" has "<<camera->getPoint_ts().size()<<" points"<<endl;
+//        for (int j = 0; j < camera->getPoint_ts().size(); ++j) {
+//            Point_t *point = camera->getPoint_ts()[j];
 //            cout<<"--------------------------------------"<<endl;
-//            cout<<"point:"<<point->getId()<<" has "<<point->getResiduals().size()<<"res"<<endl;
+//            cout<<"point:"<<point->getId()<<" has "<<point->getResidual_ts().size()<<"res"<<endl;
 //            for (int k = 0; k < WINDOW_SIZE_MAX; ++k) {
 //                cout<<"Eik:....................."<<endl;
 //                cout<<point->Eik[k]<<endl;
 //            }
 //            cout<<"C:....................."<<endl;
 //            cout<<point->C<<endl;
-//            for (int k = 0; k < point->getResiduals().size(); ++k) {
-//                Residual *residual = point->getResiduals()[k];
+//            for (int k = 0; k < point->getResidual_ts().size(); ++k) {
+//                Residual_t *residual = point->getResidual_ts()[k];
 //                cout<<"residual: "<< residual->host->getid()<<","<<residual->target->getid()<<endl;
 //            }
 //        }
@@ -136,15 +136,15 @@ void OptimizerDebugC::fetchInfo(int *camNum, int *pointNum, int *resNum) {
 Mat OptimizerDebugC::generateVCam() {
     // V: -J*r
     int resCnt = 0;
-    vector<Point*> allPoints = getAllPoints();
+    vector<Point_t*> allPoint_ts = getAllPoints();
     Mat ret;
     int matSize =FRAME_DIM * cameras.size();
     ret.resize(matSize,1);
     ret.setZero();
-    for (int i = 0; i < allPoints.size(); ++i) {
-        Point *point = allPoints[i];
+    for (int i = 0; i < allPoint_ts.size(); ++i) {
+        Point_t *point = allPoint_ts[i];
         for (int j = 0; j < point->getResiduals().size(); ++j) {
-            Residual *res = point->getResiduals()[j];
+            Residual_t *res = point->getResiduals()[j];
             int str,stc;
             stc = 0;
             str = FRAME_DIM*res->host->getid();
@@ -160,15 +160,15 @@ Mat OptimizerDebugC::generateVCam() {
 
 Mat OptimizerDebugC::generateVPoint() {
     // V: -J*r
-    vector<Point*> allPoints = getAllPoints();
+    vector<Point_t*> allPoint_ts = getAllPoints();
     Mat ret;
-    int matSize = static_cast<int>(POINT_DIM * allPoints.size());
+    int matSize = static_cast<int>(POINT_DIM * allPoint_ts.size());
     ret.resize(matSize,1);
     ret.setZero();
-    for (int i = 0; i < allPoints.size(); ++i) {
-        Point *point = allPoints[i];
+    for (int i = 0; i < allPoint_ts.size(); ++i) {
+        Point_t *point = allPoint_ts[i];
         for (int j = 0; j < point->getResiduals().size(); ++j) {
-            Residual *res = point->getResiduals()[j];
+            Residual_t *res = point->getResiduals()[j];
             int str,stc;
             stc = 0;
             str = POINT_DIM*i;
@@ -181,9 +181,9 @@ Mat OptimizerDebugC::generateVPoint() {
 Mat OptimizerDebugC::generateTotalV() {
     // V: -J*r
     int resCnt = 0;
-    vector<Point*> allPoints = getAllPoints();
+    vector<Point_t*> allPoint_ts = getAllPoints();
     Mat ret;
-    int matSize = static_cast<int>(FRAME_DIM * cameras.size() + POINT_DIM * allPoints.size());
+    int matSize = static_cast<int>(FRAME_DIM * cameras.size() + POINT_DIM * allPoint_ts.size());
     ret.resize(matSize,RES_DIM);
     ret.setZero();
     int str,stc;
@@ -192,40 +192,40 @@ Mat OptimizerDebugC::generateTotalV() {
     ret.block(str,stc,cameras.size()*FRAME_DIM,1) += generateVCam();
     // point part
     str = cameras.size()*FRAME_DIM; stc = 0;
-    ret.block(str,stc,POINT_DIM * allPoints.size(),1) += generateVPoint();
+    ret.block(str,stc,POINT_DIM * allPoint_ts.size(),1) += generateVPoint();
 
     return ret;
 }
 Mat OptimizerDebugC::generateTotalH() {
     auto J = generateTotalJ();
     auto ret =J.transpose()*J;
-//    vector<Point *> allPoints = getAllPoints();
+//    vector<Point_t *> allPoint_ts = getAllPoint_ts();
 #ifdef DEBUG
     cout<<__FUNCTION__<<", E"<<endl;
-    cout<<ret.block(0,cameras.size()*FRAME_DIM,cameras.size()*FRAME_DIM,allPoints.size()*POINT_DIM)<<endl;
-    auto HE = ret.block(0,cameras.size()*FRAME_DIM,cameras.size()*FRAME_DIM,allPoints.size()*POINT_DIM);
+    cout<<ret.block(0,cameras.size()*FRAME_DIM,cameras.size()*FRAME_DIM,allPoint_ts.size()*POINT_DIM)<<endl;
+    auto HE = ret.block(0,cameras.size()*FRAME_DIM,cameras.size()*FRAME_DIM,allPoint_ts.size()*POINT_DIM);
     auto HB = ret.block(0,0,cameras.size()*FRAME_DIM,cameras.size()*FRAME_DIM);
-    auto HC = ret.block(cameras.size()*FRAME_DIM,cameras.size()*FRAME_DIM,allPoints.size()*POINT_DIM,allPoints.size()*POINT_DIM);
+    auto HC = ret.block(cameras.size()*FRAME_DIM,cameras.size()*FRAME_DIM,allPoint_ts.size()*POINT_DIM,allPoint_ts.size()*POINT_DIM);
     cout<<__FUNCTION__<<", update"<<endl;
     cout<<HE*HC*HE.transpose()<<endl;
     cout<<__FUNCTION__<<", C"<<endl;
     cout<<HC<<endl;
     cout<<__FUNCTION__<<", E Cinv W"<<endl;
-    cout<<HE*HC.inverse()*generateVPoint()<<endl;
+    cout<<HE*HC.inverse()*generateVPoint_t()<<endl;
 #endif
     return ret;
 }
 
-vector<Point *> OptimizerDebugC::getAllPoints() {
-    vector<Point *> ret;
+vector<OptimizerDebugC::Point_t *> OptimizerDebugC::getAllPoints() {
+    vector<Point_t *> ret;
     int cameraCnt = 0;
     int pointCnt = 0;
     int resCnt = 0;
     fetchInfo(&cameraCnt,&pointCnt,&resCnt);
     for (int i = 0; i < cameraCnt; ++i) {
-        Camera *camera = cameras[i];
+        Camera_t *camera = cameras[i];
         for (int j = 0; j < camera->getPoints().size(); ++j) {
-            Point *point = camera->getPoints()[j];
+            Point_t *point = camera->getPoints()[j];
             ret.push_back(point);
         }
     }
@@ -240,14 +240,14 @@ Mat OptimizerDebugC::genBUpdate() {
     Hxixi ret;
     ret.setZero();
     // Bnew = B - E * C^-1 * Et
-    vector<Point *> allPoints = getAllPoints();
+    vector<Point_t *> allPoint_ts = getAllPoints();
     for (int i = 0; i < cameras.size(); ++i) {
         for (int j = 0; j < cameras.size(); ++j) {
             int str,stc;
             str = i*FRAME_DIM;
             stc = j*FRAME_DIM;
-            for (int k = 0; k < allPoints.size(); ++k) {
-                Point *point = allPoints[k];
+            for (int k = 0; k < allPoint_ts.size(); ++k) {
+                Point_t *point = allPoint_ts[k];
                 ret.block(str,stc,FRAME_DIM,FRAME_DIM) +=
                         (*point->Eik[i])*point->C.inverse()*point->Eik[j]->transpose();
             }
@@ -257,11 +257,11 @@ Mat OptimizerDebugC::genBUpdate() {
 #ifdef DEBUG
     cout<<__FUNCTION__<<", E"<<endl;
     Mat E;
-    E.resize(cameras.size()*FRAME_DIM,allPoints.size()*POINT_DIM);
+    E.resize(cameras.size()*FRAME_DIM,allPoint_ts.size()*POINT_DIM);
     E.setZero();
     for (int i = 0; i < cameras.size(); ++i) {
-        for (int j = 0; j < allPoints.size(); ++j) {
-            E.block(i*FRAME_DIM,j*POINT_DIM,FRAME_DIM,POINT_DIM) += allPoints[j]->Eik[i];
+        for (int j = 0; j < allPoint_ts.size(); ++j) {
+            E.block(i*FRAME_DIM,j*POINT_DIM,FRAME_DIM,POINT_DIM) += allPoint_ts[j]->Eik[i];
         }
     }
     cout<<E<<endl;
@@ -269,29 +269,29 @@ Mat OptimizerDebugC::genBUpdate() {
     cout<<ret.block(0,0,cameras.size()*FRAME_DIM,cameras.size()*FRAME_DIM)<<endl;
     cout<<__FUNCTION__<<", C"<<endl;
     Mat C;
-    C.resize(allPoints.size()*POINT_DIM,allPoints.size()*POINT_DIM);
+    C.resize(allPoint_ts.size()*POINT_DIM,allPoint_ts.size()*POINT_DIM);
     C.setZero();
-    for (int i = 0; i < allPoints.size(); ++i) {
-        C.block(i*POINT_DIM,i*POINT_DIM,POINT_DIM,POINT_DIM) = allPoints[i]->C;
+    for (int i = 0; i < allPoint_ts.size(); ++i) {
+        C.block(i*POINT_DIM,i*POINT_DIM,POINT_DIM,POINT_DIM) = allPoint_ts[i]->C;
     }
     cout<<C<<endl;
 #endif
     return ret.block(0,0,cameras.size()*FRAME_DIM,cameras.size()*FRAME_DIM);
 }
 
-Mat OptimizerDebugC::genE_CInv_VPoint(const Mat &vPoint) {
+Mat OptimizerDebugC::genE_CInv_VPoint(const Mat &vPoint_t) {
     Mat ret;
-    vector<Point *> allPoints = getAllPoints();
+    vector<Point_t *> allPoint_ts = getAllPoints();
     ret.resize(cameras.size()*FRAME_DIM,1);
     ret.setZero();
 //    int cnt = 0;
     for (int i = 0; i < cameras.size(); ++i) {
-        for (int j = 0; j < allPoints.size(); ++j) {
-            Point*point = allPoints[j];
+        for (int j = 0; j < allPoint_ts.size(); ++j) {
+            Point_t*point = allPoint_ts[j];
             int str,stc;
             str = i*FRAME_DIM;
             stc = 0;
-            ret.block(str,stc,FRAME_DIM,1) += (*point->Eik[i])*point->C.inverse()*vPoint.block(j*POINT_DIM,0,POINT_DIM,1);
+            ret.block(str,stc,FRAME_DIM,1) += (*point->Eik[i])*point->C.inverse()*vPoint_t.block(j*POINT_DIM,0,POINT_DIM,1);
 //            cout<<__FUNCTION__<<","<<cnt++<<","<<(*point->Eik[i]).transpose()<<endl;
         }
 
@@ -306,12 +306,12 @@ Mat OptimizerDebugC::genE_CInv_VPoint(const Mat &vPoint) {
 
 Mat OptimizerDebugC::generateTotalJ() {
     Mat ret;
-    vector<Point*> points = getAllPoints();
-    vector<Residual*> residuals = getAllResiduals();
+    vector<Point_t*> points = getAllPoints();
+    vector<Residual_t*> residuals = getAllResiduals();
     ret.resize(residuals.size()*RES_DIM,cameras.size()*FRAME_DIM+POINT_DIM*points.size());
     ret.setZero();
     for (int i = 0; i < residuals.size(); ++i) {
-        Residual *res = residuals[i];
+        Residual_t *res = residuals[i];
         int str,stc;
         str = i*RES_DIM;
         stc = res->host->getid()*FRAME_DIM;
@@ -335,9 +335,9 @@ Mat OptimizerDebugC::generateTotalJ() {
     return ret;
 }
 
-vector<Residual *> OptimizerDebugC::getAllResiduals() {
-    vector<Residual *> ret;
-    vector<Point*> points = getAllPoints();
+vector<OptimizerDebugC::Residual_t *> OptimizerDebugC::getAllResiduals() {
+    vector<Residual_t *> ret;
+    vector<Point_t*> points = getAllPoints();
     for (int i = 0; i < points.size(); ++i) {
         ret.insert(ret.end(),points[i]->getResiduals().begin(),points[i]->getResiduals().end());
     }
@@ -346,12 +346,12 @@ vector<Residual *> OptimizerDebugC::getAllResiduals() {
 
 Mat OptimizerDebugC::generateTotalR() {
     Mat ret;
-    vector<Residual *> residuals = getAllResiduals();
+    vector<Residual_t *> residuals = getAllResiduals();
     ret.resize(residuals.size()*RES_DIM,1);
     ret.setZero();
 
     for (int i = 0; i < residuals.size(); ++i) {
-        Residual* res = residuals[i];
+        Residual_t* res = residuals[i];
         int str,stc;
         stc = 0;
         str = i*RES_DIM;
@@ -364,17 +364,17 @@ Mat OptimizerDebugC::generateCamUpdate() {
 //    Mat update = genBUpdate();
     Mat bNew = get_B() - genBUpdate();
 
-    Mat eCinvVPoint = genE_CInv_VPoint(generateVPoint());
+    Mat eCinvVPoint_t = genE_CInv_VPoint(generateVPoint());
 #if 0
     cout<<__FUNCTION__<<"Vcam"<<endl;
     cout<<generateVCam()<<endl;
-    cout<<__FUNCTION__<<"eCinvVPoint"<<endl;
-    cout<<eCinvVPoint<<endl;
-    cout<<__FUNCTION__<<"generateVPoint"<<endl;
-    cout<<generateVPoint()<<endl;
+    cout<<__FUNCTION__<<"eCinvVPoint_t"<<endl;
+    cout<<eCinvVPoint_t<<endl;
+    cout<<__FUNCTION__<<"generateVPoint_t"<<endl;
+    cout<<generateVPoint_t()<<endl;
     cout<<__FUNCTION__<<"end"<<endl;
 #endif
-    Mat xMargSolveCam = bNew.bdcSvd(Eigen::ComputeThinU|Eigen::ComputeThinV).solve(generateVCam()-eCinvVPoint);
+    Mat xMargSolveCam = bNew.bdcSvd(Eigen::ComputeThinU|Eigen::ComputeThinV).solve(generateVCam()-eCinvVPoint_t);
     return xMargSolveCam;
 }
 
@@ -386,7 +386,7 @@ void test_init(OptimizerDebugC &system){
     cout<<ttj<<endl;
 #endif
 
-//    cout<<B-tth.block(0,0,system.getCameras().size()*FRAME_DIM,system.getCameras().size()*FRAME_DIM)<<endl;
+//    cout<<B-tth.block(0,0,system.getCamera_ts().size()*FRAME_DIM,system.getCamera_ts().size()*FRAME_DIM)<<endl;
 //
 //    cout<<"*********************"<<__FUNCTION__<<" result"<<endl;
 //    cout<< system.generateCamUpdate()<<endl;
@@ -406,7 +406,7 @@ void test_init(OptimizerDebugC &system){
     start(t);
     Mat xDirectSolve = tth.colPivHouseholderQr().solve(ttv);
     stop(t);
-    Mat xDirectSolveCam = xDirectSolve.block(0,0,FRAME_DIM*system.getCameras().size(),1);
+    Mat xDirectSolveCam = xDirectSolve.block(0,0,OptimizerDebugC::FRAME_DIM*system.getCameras().size(),1);
     cout<<"direct solve calculate duration: "<<duration(t)<<"ms"<<endl;
 
     start(t);
@@ -434,12 +434,12 @@ void test_init(OptimizerDebugC &system){
 }
 
 void test_add_camera(OptimizerDebugC &system){
-    system.insertCamera(new Camera(static_cast<int>(system.getCameras().size())));
+    system.insertCamera(new OptimizerDebugC::Camera_t(static_cast<int>(system.getCameras().size())));
 }
 
 void test_marg_point(OptimizerDebugC &system, float possibility) {
     assert(possibility < 1);
-    vector<Camera *> &cameras = system.getCameras();
+    vector<OptimizerDebugC::Camera_t *> &cameras = system.getCameras();
     int camSize = cameras.size();
     for (int i = 0; i < camSize; ++i) {
         if(cameras[i]->getPoints().size() <= 1) continue;

@@ -1,25 +1,39 @@
 //
 // Created by libaoyu on 18-11-7.
 //
-
-#ifndef WINDOWOPTIMIZATION_CAMERA_H
-#define WINDOWOPTIMIZATION_CAMERA_H
+#pragma once
 
 
 #include <vector>
 #include "../alg_config.h"
 #include "../debug_utils.h"
-class Camera;
+#include "Residual.h"
+#include "Point.h"
+#include <Eigen/Core>
+#include <Eigen/Dense>
+#include <eigen3/unsupported/Eigen/MatrixFunctions>
+template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>
 class Residual;
+
+template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>
 class Point;
+
+template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>
 class Camera{
+public:
+    typedef Point<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR> Point_t;
+    typedef Residual<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR> Residual_t;
+    typedef  typename Residual_t::Adjoint Adjoint;
+private:
     int id;
-    std::vector<Point*> points;
+    std::vector<Point_t*> points;
 
 public:
-    Camera(int _id);
-    Point *newPoint();
-    std::vector<Point*> &getPoints(){return points;}
+    using CamState = Eigen::Matrix<SCALAR,FRAME_DIM,1>;
+
+    explicit Camera(int _id);
+    Point_t *newPoint();
+    std::vector<Point_t*> &getPoints(){return points;}
     int getid(){ return id;}
     Vector delta;
     // einvCJpR = jdrdx*r - E*inv(C)*(Jdrdp * r)   (w=Jdrdp * r)
@@ -35,8 +49,35 @@ public:
     CamState state;
     Adjoint getAdjointAsH();
     Adjoint getAdjointAsT();
-
 };
 
+template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>
+Camera<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>::Camera(int _id):id(_id),state(DataGenerator::gen_data<CamState>()){
+    einvCJpR.setZero();
+    jx_r.setZero();
+    einvCJpRMargedP.setZero();
+}
+template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>
+Point<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR> *
+Camera<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>::newPoint() {
+    auto *ret = new Point<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>(static_cast<int>(points.size()), this);
+    points.push_back(ret);
+    return ret;
+}
 
-#endif //WINDOWOPTIMIZATION_CAMERA_H
+template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>
+typename Camera<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>::Adjoint Camera<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>::getAdjointAsH() {
+    Adjoint ret;
+    ret.setZero();
+    Mat R = (DataGenerator::gen_cross_mat(state.block(0,0,3,1))).exp();
+    auto that = DataGenerator::gen_cross_mat(state.block(3,0,3,1));
+    ret.block(0,0,3,3) = R;
+    ret.block(0,3,3,3) = that*R;
+    ret.block(3,3,3,3) = R;
+    return ret;
+}
+template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>
+typename Camera<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>::Adjoint
+Camera<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>::getAdjointAsT() {
+    return Adjoint::Identity();
+}

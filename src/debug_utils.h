@@ -25,10 +25,10 @@ public:
         }
         return ret;
     }
-    static Mat gen_cross_mat(const Mat &in){
+    static Eigen::Matrix3d gen_cross_mat(const Mat &in){
         using namespace std;
         assert(in.rows() == 3);
-        Mat ret;
+        Eigen::Matrix3d ret;
         ret.resize(3,3);
         ret.setZero();
         ret(0,1) -= in(2);

@@ -5,11 +5,11 @@
 #ifndef WINDOWOPTIMIZATION_TYPES_H
 #define WINDOWOPTIMIZATION_TYPES_H
 
-#define RES_DIM 3
-#define FRAME_DIM 8
-#define WINDOW_SIZE_MAX 8
-#define POINT_DIM 1
-#define SCALAR double
+//#define RES_DIM 3
+//#define FRAME_DIM 8
+//#define WINDOW_SIZE_MAX 8
+//#define POINT_DIM 1
+//#define SCALAR double
 
 extern const float _G_gradStereoThershold;
 
