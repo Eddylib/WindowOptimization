@@ -4,7 +4,7 @@ project(WindowOptimization)
 set(CMAKE_CXX_STANDARD 14)
 #如果采用NRV优化，很多情况下需要调用移动构造函数的代码都会被优化掉，拷贝构造函数暂时没有这个问题
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -O0 -fno-elide-constructors")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -O0")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -O0")
 SET( CMAKE_VERBOSE_MAKEFILE on )
 #set(Eigen3_DIR "/home/libaoyu/Desktop/dist_root/usr/local/share/eigen3/cmake")
 #find_package(Eigen3 REQUIRED)
@@ -12,6 +12,7 @@ SET( CMAKE_VERBOSE_MAKEFILE on )
 #message(STATUS EIGEN3_INCLUDE_DIR:${EIGEN3_INCLUDE_DIR})
 
 add_subdirectory(third_party/yaml-cpp)
+include_directories(third_party/Sophus)
 include_directories(${YAML_CPP_SOURCE_DIR}/src)
 include_directories(${YAML_CPP_SOURCE_DIR}/include)
 
@@ -54,3 +55,6 @@ add_executable(test test.cpp utils.h)
 
 add_executable(test_img_loader test_img_loader.cpp src/frontend/DispMatcher.h src/frontend/DispMatcher.cpp)
 target_link_libraries(test_img_loader full_system)
+
+add_executable(main_ba main_ba.cpp)
+target_link_libraries(main window_optimization)

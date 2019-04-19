@@ -2,3 +2,6 @@
 	path = third_party/yaml-cpp
 	url = https://github.com/jbeder/yaml-cpp
 	ignore = dirty
+[submodule "third_party/Sophus"]
+	path = third_party/Sophus
+	url = https://github.com/strasdat/Sophus

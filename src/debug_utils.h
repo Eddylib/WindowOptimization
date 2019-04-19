@@ -10,7 +10,7 @@
 #include "alg_utils.h"
 #include <time.h>
 #include <sys/time.h>
-#define  dbcout cout<<__FILE__<<","<<__FUNCTION__<<","<<__LINE__<<": "
+#define  dbcout cout<<__FILE__<<","<<__FUNCTION__<<","<<__LINE__<<": "<<endl
 
 class DataGenerator{
 public:

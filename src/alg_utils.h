@@ -17,7 +17,7 @@ typedef Eigen::VectorXd Vector;
 //typedef Eigen::Matrix<SCALAR,RES_DIM,FRAME_DIM> Jdrdxi_t;
 //typedef Eigen::Matrix<SCALAR,POINT_DIM,POINT_DIM> Jdrdp2_t;
 //typedef Eigen::Matrix<SCALAR,FRAME_DIM,FRAME_DIM> Jdrdxi2_t;
-//typedef Eigen::Matrix<SCALAR,WINDOW_SIZE_MAX*FRAME_DIM,WINDOW_SIZE_MAX*FRAME_DIM> Hxixi;
+//typedef Eigen::Matrix<SCALAR,WINDOW_SIZE_MAX*FRAME_DIM,WINDOW_SIZE_MAX*FRAME_DIM> Hxixi_t;
 //typedef Eigen::Matrix<SCALAR,FRAME_DIM,FRAME_DIM> Adjoint;
 //template <typename T>
 //void nms_(cv::Mat &grad);

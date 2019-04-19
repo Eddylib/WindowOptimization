@@ -11,18 +11,16 @@
 #include "Point.h"
 #include <Eigen/Core>
 #include <Eigen/Dense>
+#include <sophus/se3.hpp>
 #include <eigen3/unsupported/Eigen/MatrixFunctions>
-template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>
-class Residual;
 
-template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>
-class Point;
+#include "type_pre_declares.h"
 
 template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>
 class Camera{
 public:
     typedef Point<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR> Point_t;
-    typedef Residual<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR> Residual_t;
+    typedef ResidualBase<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR> Residual_t;
     typedef  typename Residual_t::Adjoint Adjoint;
 private:
     int id;
@@ -32,6 +30,7 @@ public:
     using CamState = Eigen::Matrix<SCALAR,FRAME_DIM,1>;
 
     explicit Camera(int _id);
+    explicit Camera(int _id, CamState camState);
     Point_t *newPoint();
     std::vector<Point_t*> &getPoints(){return points;}
     int getid(){ return id;}
@@ -47,12 +46,17 @@ public:
 
     Eigen::Matrix<SCALAR,FRAME_DIM,1> prior_h;
     CamState state;
+    Sophus::SE3<SCALAR> se3State;
     Adjoint getAdjointAsH();
     Adjoint getAdjointAsT();
 };
 
 template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>
-Camera<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>::Camera(int _id):id(_id),state(DataGenerator::gen_data<CamState>()){
+Camera<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>::Camera(int _id):Camera(_id,DataGenerator::gen_data<CamState>()){
+
+}
+template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>
+Camera<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>::Camera(int _id, CamState camState):id(_id),state(camState){
     einvCJpR.setZero();
     jx_r.setZero();
     einvCJpRMargedP.setZero();
@@ -60,7 +64,7 @@ Camera<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>::Camera(int _id):id(_
 template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>
 Point<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR> *
 Camera<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>::newPoint() {
-    auto *ret = new Point<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>(static_cast<int>(points.size()), this);
+    auto *ret = new Point<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>(static_cast<int>(points.size()));
     points.push_back(ret);
     return ret;
 }

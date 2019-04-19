@@ -6,6 +6,8 @@ Basic WindowOptimization algorithm in SLAM.
 - [x] 各个类数据放到了类本身的结构体里
 - [x] 实现完整地marg掉点
 - [x] 加入EuRoC MAV数据集加载代码，便于以后进一步完善及测试
+- [x] 模板化，参数可根据实际情况调整
+- [x] Hession矩阵、Residual结构OO化，并修改OptimizerDebug为一个实现样例
 
 
 todo..
