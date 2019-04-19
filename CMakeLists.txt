@@ -56,5 +56,5 @@ add_executable(test test.cpp utils.h)
 add_executable(test_img_loader test_img_loader.cpp src/frontend/DispMatcher.h src/frontend/DispMatcher.cpp)
 target_link_libraries(test_img_loader full_system)
 
-add_executable(main_ba main_ba.cpp)
+add_executable(main_ba srcBA/main_ba.cpp)
 target_link_libraries(main window_optimization)

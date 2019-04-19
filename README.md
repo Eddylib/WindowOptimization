@@ -8,9 +8,11 @@ Basic WindowOptimization algorithm in SLAM.
 - [x] 加入EuRoC MAV数据集加载代码，便于以后进一步完善及测试
 - [x] 模板化，参数可根据实际情况调整
 - [x] Hession矩阵、Residual结构OO化，并修改OptimizerDebug为一个实现样例
+- [x] 完成BA中的残差计算、梯度计算
 
 
 todo..
+- [ ] 完整的BA就差验证上面的第7条！！
 - [ ] 地图点部分的update求解（easy，低优先级）
 - [ ] 实现完整地marg掉帧
 - [ ] LM算法

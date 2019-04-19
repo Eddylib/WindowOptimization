@@ -6,97 +6,10 @@
 #include <sophus/se3.hpp>
 #include <sophus/so3.hpp>
 #include <map>
-#include "src/backend/window_optimization.h"
-//#define RES_DIM 3
-//#define FRAME_DIM 8
-//#define WINDOW_SIZE_MAX 8
-//#define POINT_DIM 1
-//#define SCALAR double
-const static int res_dim = 2;   // dertx, derty
-const static int frame_dim = 9; // se3 x 6, f, p1, p2
-const static int window_size = 2000;
-const static int point_dim = 3; // point in 3d space
-#define Scalar double
-using WindowOptimizor_t = WindowOptimizor<res_dim,frame_dim,window_size,point_dim, Scalar>;
-using Camera_t = WindowOptimizor_t::Camera_t;
-using Point_t = WindowOptimizor_t::Point_t ;
-using Residual_t = WindowOptimizor_t::Residual_t ;
+#include "ResidualBA.h"
+#include "HessionBA.h"
+
 // BALProblem loader from ceres document
-template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>
-class ResidualBA:public ResidualBase<RES_DIM, FRAME_DIM, WINDOW_SIZE_MAX, POINT_DIM, SCALAR>{
-public:
-    using Base_t = ResidualBase<RES_DIM, FRAME_DIM, WINDOW_SIZE_MAX, POINT_DIM, SCALAR>;
-    using WindowOptimizor_t = typename Base_t::WindowOptimizor_t;
-    using Camera_t = typename Base_t::Camera_t;
-    using Point_t = typename Base_t::Point_t;
-    using Jdrdp_t = typename Base_t ::Jdrdp_t;
-    using Jdrdxi_t = typename Base_t ::Jdrdxi_t;
-    using VectorFrameDim_t = typename Base_t ::VectorFrameDim;
-    using VectorPointDim = typename Base_t ::VectorPointDim;
-    using ResData = typename Base_t ::ResData;
-private:
-    Camera_t *host;
-    Point_t *point;
-    Jdrdp_t jdrdp;
-    Jdrdxi_t jdrdxi; //对位姿的求导
-    VectorFrameDim_t jxi_r;
-    VectorPointDim jp_r;
-    ResData resdata;
-    ResData observasion;
-public:
-    ResidualBA(Camera_t *_host,Point_t *_point,const ResData &_resdata, const ResData &_observasion):
-            host(_host),point(_point),
-            jdrdp(DataGenerator::gen_data<Jdrdp_t>()),
-            jdrdxi(DataGenerator::gen_data<Jdrdxi_t>()),
-            observasion(_observasion)
-            {
-
-        jxi_r = jdrdxi.transpose()*resdata;          //  jdrdxi_th *r
-        jp_r = jdrdp.transpose()*resdata;
-
-
-        //other
-        if(host)
-        host->jx_r -= jxi_r;
-        if(point)
-        point->addJp_r(jp_r);
-    }
-    ResidualBA(Camera_t *_host,Point_t *_point,const ResData &_observasion):ResidualBA(_host,_point,DataGenerator::gen_data<Eigen::Matrix<SCALAR,RES_DIM,1>>(),_observasion){
-    }
-    void computeRes() override {
-        Scalar & res_y = resdata(0);
-        Scalar & res_x = resdata(1);
-
-
-        // camera[0,1,2，3,4,5] se3
-        // 6 focal`
-        // 7,8 second and fourth order radial distortion.
-    };
-    void computeJ(){};
-    void initApplyData(WindowOptimizor_t &optimizor) override {
-        // one for target, one for host
-//        *point->Eik[host->getid()] += jdrdxi*jdrdp;
-        point->addEik(host->getid(),jdrdxi.transpose()*jdrdp);
-//        point->getResiduals().push_back(this);
-//        point->C+= jdrdp.transpose()*jdrdp;             //  jdrdp * r
-        point->addC(jdrdp.transpose()*jdrdp);
-
-        //B !!```
-        int sth;
-        sth = FRAME_DIM*host->getid();
-
-        Mat accB = jdrdxi.transpose()*jdrdxi;
-
-        if(optimizor.ifCamUninit(host->getid())){
-            optimizor.setZeroBpart(sth,sth,FRAME_DIM,FRAME_DIM);
-            optimizor.setCaminited(host->getid());
-        }
-        optimizor.updateBpart(sth,sth,FRAME_DIM,FRAME_DIM,accB);
-    }
-};
-
-using ResidualBA_t = ResidualBA<res_dim,frame_dim,window_size,point_dim, Scalar>;
-
 class BALProblem {
 public:
     ~BALProblem() {
@@ -207,32 +120,29 @@ public:
         // camera[3,4,5] are the translation.
         // 6 focal
         // 7,8 second and fourth order radial distortion.
-        auto rotation = double_to_rotate(data);
-        Sophus::SE3<Scalar> se3 = double_to_se3(data);
+        Eigen::Vector3d angleAxisData(data[0],data[1],data[2]);
+        Eigen::Vector3d translation(data[3],data[4],data[5]);
+        double radian = angleAxisData.norm();
+        angleAxisData /= radian;
+        Eigen::Quaterniond quaternion;
+        quaternion = Eigen::AngleAxisd(radian,angleAxisData);
+
+        Sophus::SE3<Scalar> se3(quaternion,translation);
         Camera_t::CamState ret;
-        ret.segment<6>(0) = se3.log();
+        ret.block(0,0,6,1) = se3.log();
         ret(6) = data[6];
         ret(7) = data[7];
         ret(8) = data[8];
         return ret;
     }
     static Sophus::SE3<Scalar> double_to_se3(Scalar *data){
-        auto rotation = double_to_rotate(data);
-        Sophus::SE3<Scalar> se3(rotation,Sophus::SE3<Scalar>::Point(data[3],data[4],data[5]));
-    }
-    static Eigen::Matrix3d double_to_rotate(Scalar *data){
-        Eigen::Vector3d vect3(data[0],data[1],data[2]);
-        double theta = vect3.norm();
-        double costheta = cos(theta);
-        double sintheta = sin(theta);
-        vect3.normalize();
-        Eigen::Matrix3d I;
-        I.setIdentity();
-        auto vect3hat = Sophus::SO3<Scalar>::hat(vect3);
-        Eigen::Matrix3d rotation = costheta*I
-                + (1-costheta)*vect3*vect3.transpose()
-                + sintheta*vect3hat;
-        return rotation;
+        Eigen::Vector3d angleAxisData(data[0],data[1],data[2]);
+        Eigen::Vector3d translation(data[3],data[4],data[5]);
+        double radian = angleAxisData.norm();
+        angleAxisData /= radian;
+        Eigen::Quaterniond quaternion;
+        quaternion = Eigen::AngleAxisd(radian,angleAxisData);
+        return Sophus::SE3<Scalar>(quaternion,translation);
     }
     bool get_point_in_window(BALProblem &balProblem, int window_start, int window_size, set<int> &result) {
         for (int i = 0; i < window_size; ++i) {//对窗口内每个相机
@@ -288,12 +198,17 @@ void do_ba(WindowOptimizor_t &windowOptimizor, BALProblem &balProblem){
     }
     vector<Point_t *> allPoints;
     for (int i = 0; i < balProblem.num_points(); ++i) {
+//        if(i==0){
+//            dbcout<<Eigen::Vector3d(balProblem.mutable_point_for_observation(i))<<endl;
+//        }
         Point_t::PointState state;
         state<<balProblem.mutable_point_for_observation(i)[0],
         balProblem.mutable_point_for_observation(i)[1],
         balProblem.mutable_point_for_observation(i)[2];
+
         auto *point = new Point_t(i,state);
         allPoints.push_back(point);
+        windowOptimizor.insertPoint(point);
     }
     cout<<"points all added"<<endl;
 
@@ -303,17 +218,24 @@ void do_ba(WindowOptimizor_t &windowOptimizor, BALProblem &balProblem){
                 allCameras[balProblem.getCamera_index_by_idx(i)],
                 allPoints[balProblem.getPoint_index_by_idx(i)],
                 ResidualBA_t::ResData(balProblem.observations(i)));
+        allCameras[balProblem.getCamera_index_by_idx(i)]->getPoints().push_back(
+                allPoints[balProblem.getPoint_index_by_idx(i)]);
         allResiduals.push_back(residual);
+        windowOptimizor.addResidual(residual);
     }
     cout<<"residuals all added"<<endl;
+    Mat delta;
+    windowOptimizor.step_once(delta);
+    cout<<"step once"<<endl;
 }
 int main(){
     BALProblem problemLoader;
-    problemLoader.LoadFile("/home/libaoyu/Data/ceres_learning/cmake-build-debug/problem-1695-155710-pre.txt");
+    problemLoader.LoadFile("/home/libaoyu/Data/ba_problems/problem-49-7776-pre.txt");
     cout<<"problem loaded"<<endl;
 //    cout<<problemLoader.num_observations()<<endl;
     int num_cams = problemLoader.num_cameras();
-    WindowOptimizor_t windowOptimizor;
+    HessionStructBA_t *hessionStructBA = new HessionStructBA_t();
+    WindowOptimizor_t windowOptimizor(hessionStructBA);
     cout<<num_cams<<endl;
     cout<<problemLoader.num_observations()<<endl;
     do_ba(windowOptimizor,problemLoader);

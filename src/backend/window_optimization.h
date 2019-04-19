@@ -82,6 +82,7 @@ private:
     void marginlizeOnePoint(Point_t *point);
     //由于点被marg而导致的信息增值
     vector<Camera_t *> cameras;
+    list<Point_t *> points;
 //    void attach_B();    //B 只有在第一次运算时才会调用此函数将所有数据加载到B上，之后只需进行优化来更新B
 public:
     explicit WindowOptimizor(HessionStruct_t *_hessionStruct);
@@ -174,24 +175,36 @@ WindowOptimizor<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>::step_once(
             //cameras[i]->jx_r与残差直接相关，归到addResidual里
             //cameras[i]->jx_r.setZero();
         }
-        for (int i = 0; i < camSize; ++i) {
-            Camera_t *camera = cameras[i];
-            for (int j = 0; j < camera->getPoints().size(); ++j) {
-                Point_t *point = camera->getPoints()[j];
-                if(point->getStatus() == Status::MARGINALIZED)
-                    continue;
-                assert(point->getStatus() != Status::TOBE_MARGINLIZE);
-                hessionStruct->stepApplyPoint(point,cameras.size());
-                // 准备方程组右上角
-                for (int k = 0; k < camSize; ++k) {
-                    cameras[k]->einvCJpR -= point->getEik(k)
-                                            *point->getC().inverse()*point->getJp_r();
-
-                }
-
-//                cout<<__FUNCTION__<<","<<cntE++<<","<<(*point->Eik[i]).transpose()<<endl;
+        for(auto iter = points.begin(); iter!= points.end(); iter++){
+            Point_t *point = *iter;
+            if(point->getStatus() == Status::MARGINALIZED)
+                continue;
+            assert(point->getStatus() != Status::TOBE_MARGINLIZE);
+            hessionStruct->stepApplyPoint(point,cameras.size());
+            // 准备方程组右上角
+            for (int k = 0; k < camSize; ++k) {
+                cameras[k]->einvCJpR -= point->getEik(k)
+                                        *point->getC().inverse()*point->getJp_r();
             }
-        };
+        }
+//        for (int i = 0; i < camSize; ++i) {
+//            Camera_t *camera = cameras[i];
+//            for (int j = 0; j < camera->getPoints().size(); ++j) {
+//                Point_t *point = camera->getPoints()[j];
+//                if(point->getStatus() == Status::MARGINALIZED)
+//                    continue;
+//                assert(point->getStatus() != Status::TOBE_MARGINLIZE);
+//                hessionStruct->stepApplyPoint(point,cameras.size());
+//                // 准备方程组右上角
+//                for (int k = 0; k < camSize; ++k) {
+//                    cameras[k]->einvCJpR -= point->getEik(k)
+//                                            *point->getC().inverse()*point->getJp_r();
+//
+//                }
+//
+////                cout<<__FUNCTION__<<","<<cntE++<<","<<(*point->Eik[i]).transpose()<<endl;
+//            }
+//        };
         Mat optRight =
                 Eigen::Matrix<SCALAR,WINDOW_SIZE_MAX*FRAME_DIM,1>::Ones();
 #if 0
@@ -254,13 +267,15 @@ WindowOptimizor<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>::step_once(
 
 template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>
 void WindowOptimizor<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>::insertPoint(Point_t *point) {
-
+    points.push_back(point);
 }
 
 template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>
 void WindowOptimizor<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>::addResidual(Residual_t *residual) {
-
-    residual->initApplyData(hessionStruct);
+    residual->computeRes();
+    residual->computeJ();
+    residual->initApplyDataToPoint(hessionStruct);
+    hessionStruct->initapplyRes(residual);
 
 }
 template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>

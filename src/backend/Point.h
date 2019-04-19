@@ -29,6 +29,7 @@ public:
     int getId(){return id;}
     std::vector<Residual_t*>& getResiduals(){return residuals;}
     int hasResidualWithTarget(int camId);
+    bool ifHasEik(int i){return Eik[i];}
     // i 为相机个数， k为点数，而k即指自己，所以为一维数组，8个，为窗口大小
     const Eigen::Matrix<SCALAR,FRAME_DIM,POINT_DIM> &getEik(int i)const{
         if(Eik[i] == nullptr){
@@ -61,13 +62,14 @@ public:
         jp_r += other;
     }
     const static Eigen::Matrix<SCALAR,FRAME_DIM,POINT_DIM> zero;
+    const PointState &getPointState()const{return pointState;}
 private:
     std::vector<Eigen::Matrix<SCALAR,FRAME_DIM,POINT_DIM> *> Eik;
     Eigen::Matrix<SCALAR,POINT_DIM,POINT_DIM> C;
     PointState jp_r;
     PointState prior;
     PointState pointState;
-    Vector delta;
+//    Vector delta;
     Status status;
 
 ////前端数据结构

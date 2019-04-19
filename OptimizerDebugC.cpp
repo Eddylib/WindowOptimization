@@ -66,6 +66,7 @@ void OptimizerDebugC::newResidual(Camera_t *host, Camera_t *target, float possib
     // host没点，必然要新建点，possibilityCreateNewPoint_t新建点
     if(host->getPoints().empty() || ifcreate){
         point = host->newPoint();
+        optimizor->insertPoint(point);
     }
     // 如果没有新建点，则在host里选择一个点，如果选的点与target和host已经有联系，则再选则其他的与host无联系的点
     // 如果找不到，才新建点
@@ -75,6 +76,7 @@ void OptimizerDebugC::newResidual(Camera_t *host, Camera_t *target, float possib
         tmp = host->getPoints()[ptIdx];
         if(!tmp || tmp->hasResidualWithTarget(target->getid())){
             tmp = host->newPoint();
+            optimizor->insertPoint(tmp);
         }
         point = tmp;
     }
@@ -186,7 +188,7 @@ Mat OptimizerDebugC::generateTotalV() {
     vector<Point_t*> allPoint_ts = getAllPoints();
     Mat ret;
     int matSize = static_cast<int>(FRAME_DIM * optimizor->getCameras().size() + POINT_DIM * allPoint_ts.size());
-    ret.resize(matSize,RES_DIM);
+    ret.resize(matSize,1);
     ret.setZero();
     int str,stc;
     // camera part
