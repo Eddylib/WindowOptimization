@@ -5,7 +5,9 @@
 #ifndef WINDOWOPTIMIZATION_ALG_UTILS_H
 #define WINDOWOPTIMIZATION_ALG_UTILS_H
 
+#ifdef BUILD_FROUNT
 #include <opencv2/core.hpp>
+#endif
 #include <eigen3/Eigen/Dense>
 #include "alg_config.h"
 

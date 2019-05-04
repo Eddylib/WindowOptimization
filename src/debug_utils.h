@@ -4,13 +4,14 @@
 
 #ifndef WINDOWOPTIMIZATION_DEBUG_UTILS_H
 #define WINDOWOPTIMIZATION_DEBUG_UTILS_H
-
+#ifdef BUILD_FROUNT
 #include <opencv2/core/hal/interface.h>
+#endif
 #include "alg_config.h"
 #include "alg_utils.h"
 #include <time.h>
 #include <sys/time.h>
-#define  dbcout cout<<__FILE__<<","<<__FUNCTION__<<","<<__LINE__<<": "<<endl
+#define  dbcout std::cout<<__FILE__<<","<<__FUNCTION__<<","<<__LINE__<<": "<<std::endl
 
 class DataGenerator{
 public:
@@ -41,7 +42,7 @@ public:
         return ret;
     }
 };
-
+#ifdef BUILD_FROUNT
 inline std::string type2str(int type) {
     std::string r;
 
@@ -64,6 +65,7 @@ inline std::string type2str(int type) {
 
     return r;
 }
+#endif
 inline void start(timeval  *time){
     gettimeofday(time, NULL);
 }

@@ -22,7 +22,7 @@ public:
     using Adjoint = typename Base_t ::Adjoint;
     using HessionBase_t = HessionBase<RES_DIM, FRAME_DIM, WINDOW_SIZE_MAX, POINT_DIM, SCALAR>;
 
-    void initApplyDataToPoint(HessionBase_t *hessionBase);
+    void applyDataToPoint(HessionBase_t *hessionBase);
     Residual(Camera_t *_host,Camera_t *_target,Point_t *_point,Eigen::Matrix<SCALAR,RES_DIM,1>);
     Residual(Camera_t *_host,Camera_t *_target,Point_t *_point);
     Adjoint getAdjH();
@@ -67,6 +67,7 @@ Residual<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>::Residual(Camera_t 
 //        cerr<<"warning: residual"
     }
 
+    point->getResiduals().push_back(this);
     jthAdjH_r = getJthAdjH().transpose()*resdata;   //  jdrdxi_th * adjH *r 绝对位姿的导数乘以残差
     jthAdjT_r = getJthAdjT().transpose()*resdata;   //  jdrdxi_th * adjT *r
     jth_r = jdrdxi_th.transpose()*resdata;          //  jdrdxi_th *r
@@ -106,12 +107,11 @@ Residual<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>::getJthAdjT() {
 
 template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>
 void
-Residual<RES_DIM, FRAME_DIM, WINDOW_SIZE_MAX, POINT_DIM, SCALAR>::initApplyDataToPoint(
+Residual<RES_DIM, FRAME_DIM, WINDOW_SIZE_MAX, POINT_DIM, SCALAR>::applyDataToPoint(
         HessionBase_t *hessionBase) {
     // one for target, one for host
     point->addEik(host->getid(),getJthAdjH().transpose()*jdrdp);
     point->addEik(target->getid(),getJthAdjT().transpose()*jdrdp);
-    point->getResiduals().push_back(this);
     point->addC(jdrdp.transpose()*jdrdp);             //  jdrdp * r
 }
 

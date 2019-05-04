@@ -13,48 +13,47 @@ public:
     using WindowOptimizor_t = typename Base_t::WindowOptimizor_t;
     using Camera_t = typename Base_t::Camera_t;
     using Point_t = typename Base_t::Point_t;
-    using Jdrdp_t = typename Base_t ::Jdrdp_t;
-    using Jdrdxi_t = typename Base_t ::Jdrdxi_t;
     using VectorFrameDim_t = typename Base_t ::VectorFrameDim;
     using VectorPointDim = typename Base_t ::VectorPointDim;
     using ResData = typename Base_t ::ResData;
     using Point3D = typename Point_t::PointState;
     using Point2D = Eigen::Matrix<SCALAR,2,1>;
+    using JdpdP_t = Eigen::Matrix<SCALAR,2,POINT_DIM>;
+    using JdrdP_t = Eigen::Matrix<SCALAR,RES_DIM,POINT_DIM>;
+    using JdPdxi_t = Eigen::Matrix<SCALAR,POINT_DIM,6>;
+    using Jdrdp_t = Eigen::Matrix<SCALAR,RES_DIM,2>;
+    using Jdrdcam_t = Eigen::Matrix<SCALAR,RES_DIM,FRAME_DIM>;
 private:
     Camera_t *host;
     Point_t *point;
-    Jdrdp_t jdrdp;
-    Jdrdxi_t jdrdxi; //对位姿的求导
-    VectorFrameDim_t jxi_r;
-    VectorPointDim jp_r;
+    JdrdP_t jdrdPw;
+    Jdrdcam_t jdrdcam; //对相机整体
     ResData resdata;
+
+
+    JdpdP_t jdpcdPc;
+    JdrdP_t jdrdPc;
+    JdPdxi_t jdPcdxi;
+    VectorFrameDim_t jcam_r;
+    VectorPointDim jPw_r;
     ResData observasion;
     //运算过程中的变量
-    Point3D projected;
-    Point2D projected2d;
-    Point2D undistored;
-    SCALAR distortion;
-    SCALAR focal;
-    SCALAR p2dtp2d;
+    Point3D Pc;
+    Point2D pc;
+    Jdrdp_t jdrdpc;
 public:
     ResidualBA(Camera_t *_host,Point_t *_point,const ResData &_resdata, const ResData &_observasion):
             host(_host),point(_point),
-            jdrdp(DataGenerator::gen_data<Jdrdp_t>()),
-            jdrdxi(DataGenerator::gen_data<Jdrdxi_t>()),
+            jdrdPw(DataGenerator::gen_data<JdrdP_t>()),
+            jdrdcam(DataGenerator::gen_data<Jdrdcam_t>()),
             observasion(_observasion)
     {
-        jxi_r = jdrdxi.transpose()*resdata;          //  jdrdxi_th *r
-        jp_r = jdrdp.transpose()*resdata;
-        //other
-        if(host)
-            host->jx_r -= jxi_r;
-        if(point)
-            point->addJp_r(jp_r);
+        point->getResiduals().push_back(this);
     }
-    ResidualBA(Camera_t *_host,Point_t *_point,const ResData &_observasion):ResidualBA(_host,_point,DataGenerator::gen_data<Eigen::Matrix<SCALAR,RES_DIM,1>>(),_observasion){
-
+    ResidualBA(Camera_t *_host,Point_t *_point,const ResData &_observasion):
+    ResidualBA(_host,_point,DataGenerator::gen_data<Eigen::Matrix<SCALAR,RES_DIM,1>>(),_observasion){
     }
-    const Jdrdxi_t &getJdrdxi()const {return jdrdxi;}
+    const Jdrdxi_t &getJdrdxi()const {return jdrdcam;}
     Camera_t * getHost(){
         return host;
     }
@@ -63,73 +62,70 @@ public:
         // 6 focal`
         // 7,8 second and fourth order radial distortion.
 //        dbcout<<point->getPointState()<<endl;
-        projected = host->se3State * point->getPointState();
-        projected2d(0) = - projected[0]/projected[2];
-        projected2d(1) = - projected[1] / projected[2];
-        const SCALAR& l1 = host->state[7];
-        const SCALAR& l2 = host->state[8];
-        p2dtp2d = projected2d.transpose()*projected2d;;
-        SCALAR r2 = p2dtp2d;
-        distortion = 1.0 + r2  * (l1 + l2  * r2);
+        Pc = host->getSE3State() * point->getPointState();
+        pc(0) = - Pc[0]/Pc[2];
+        pc(1) = - Pc[1] / Pc[2];
+        const typename Camera_t::CamState &camState = host->getState();
 
-        focal = host->state[6];
-        undistored = focal*distortion*projected2d;
+        const double& l1 = camState[7];
+        const double& l2 = camState[8];
+        double r2 = pc.transpose()*pc;
+        double distortion = 1.0 + r2  * (l1 + l2  * r2);
+        const double& focal = camState[6];
+
+        Eigen::Vector2d pfinal = focal*distortion*pc;
         // The error is the difference between the predicted and observed position.
-        resdata = undistored - observasion;
+        resdata = pfinal - observasion;
+
+
+        double A = r2;
+        double B = (l1 + A * l2);
+        jdrdpc = focal*(
+                2.*(B + A*l2)*pc*pc.transpose()
+                + distortion*Eigen::Matrix<double,RES_DIM,RES_DIM>::Identity()
+        );
+        jdpcdPc<<
+               -1./Pc(2),  0,          Pc(0)/(Pc(2)*Pc(2)),
+                0,          -1./Pc(2),  Pc(1)/(Pc(2)*Pc(2));
+        jdrdPc = jdrdpc * jdpcdPc;
+        jdPcdxi.block(0,0,3,3).setIdentity();
+        jdPcdxi.block(0,3,3,3)=Sophus::SO3<double>::hat(-Pc);
+
+        jdrdcam.block(0,0,2,6) = jdrdPc*jdPcdxi;
+
+        jdrdcam.block(0,6,2,1) = distortion*pc; //drdf
+        jdrdcam.block(0,7,2,1) = focal*r2*pc; //drdl1
+        jdrdcam.block(0,8,2,1) = focal*r2*r2*pc; //drdl2
+
+
+        jdrdPw = jdrdPc*host->getSE3State().rotationMatrix();
+
+        jcam_r = jdrdcam.transpose()*resdata;
+        jPw_r = jdrdPw.transpose()*resdata;
+//        dbcout<<camState<<std::endl;
+//        if(abs(point->getPointState()[0] + 12.056) < 0.001){
+//            dbcout<<camState[0]<<std::endl;
+//            dbcout<<point->getPointState()<<std::endl;
+//        }
+//        if(abs(point->getPointState()[0] + 12.056) < 0.001 && abs(camState[0] + 0.016944) < 0.001){
+//            dbcout<<pfinal<<std::endl;
+//            dbcout<<jdrdcam<<std::endl;
+//            dbcout<<jdrdPw<<std::endl;
+//            exit(-1);
+//        }
     };
-    void computeJ() override {
-        Jdrdp_t jdrdp_tmp; //2x3
-        Jdrdxi_t jdrdxi_tmp; //2x9 xi(1~6) f(7) l1 (8) l2(9)
-        Point2D drdf = distortion*projected2d;
-        Point2D drdl1 = focal*p2dtp2d*projected2d;
-        Point2D drdl2 = focal*p2dtp2d*p2dtp2d*projected2d;
-        const SCALAR& l1 = host->state[7];
-        const SCALAR& l2 = host->state[8];
 
-        Eigen::Matrix<SCALAR, 2, 2> drdp2d;
-        SCALAR px = projected2d(0);
-        SCALAR px2 = px*px;
-        SCALAR py = projected2d(1);
-        SCALAR py2 = py*py;
-        SCALAR pxpy = px*py;
-        SCALAR A = 1+p2dtp2d;
-        SCALAR B = l1 + l2*p2dtp2d;
-        drdp2d(0,0) = 2.*px2*B + A*(2*l2*px2 +B);
-        drdp2d(0,1) = 2.*(pxpy+l2);
-        drdp2d(1,0) = drdp2d(0,1);
-        drdp2d(1,1) = 2*A*l2*py2 + 2*py2*B;
-        Eigen::Matrix<SCALAR, RES_DIM, POINT_DIM> dpdPpj;
-        dpdPpj.setZero();
-        dpdPpj(0,0) = -1./projected(2);
-        dpdPpj(0,2) = -projected(0);
-        dpdPpj(1,1) = -1./projected(2);
-        dpdPpj(1,2) = -projected(1);
+    void applyDataToPoint(HessionStruct_t *hessionBase) override {
+        point->addEik(host->getid(),jdrdcam.transpose()*jdrdPw);
+        point->addC(jdrdPw.transpose()*jdrdPw);             //  jdrdp * r
 
-        Eigen::Matrix<SCALAR,POINT_DIM,POINT_DIM> dPpjdP = host->se3State.rotationMatrix();
-        jdrdp = drdp2d*dpdPpj*dPpjdP;
+        point->addJp_r(jPw_r);
+        host->jx_r += jcam_r;
+    }
 
-        Eigen::Matrix<SCALAR,POINT_DIM,2*POINT_DIM> dPpjdxi;
-        dPpjdxi.block(0,0,3,3).setIdentity();
-        Eigen::Matrix<SCALAR,POINT_DIM,POINT_DIM> right = dPpjdxi.block(0,3,3,3);
-        right(0,1) = projected(2);
-        right(0,2) = -projected(1);
-        right(1,0) = -projected(2);
-        right(1,2) = projected(0);
-        right(2,0) = projected(1);
-        right(2,1) = -projected(0);
-        Eigen::Matrix<SCALAR,RES_DIM,2*POINT_DIM> drdxi;
-        drdxi = drdp2d*dpdPpj*dPpjdxi;
-
-        jdrdxi.block(0,0,RES_DIM,6) = drdxi;
-        jdrdxi.block(0,6,RES_DIM,1) = drdf;
-        jdrdxi.block(0,7,RES_DIM,1) = drdl1;
-        jdrdxi.block(0,8,RES_DIM,1) = drdl2;
-    };
-    void initApplyDataToPoint(HessionStruct_t *hessionBase) override {
-        // one for target, one for host
-        point->addEik(host->getid(),jdrdxi.transpose()*jdrdp);
-        point->getResiduals().push_back(this);
-        point->addC(jdrdp.transpose()*jdrdp);             //  jdrdp * r
+    SCALAR asScalar() const override{
+        SCALAR ret = resdata.norm();
+        return ret*ret;
     }
 };
 using ResidualBA_t = ResidualBA<res_dim,frame_dim,window_size,point_dim, Scalar>;

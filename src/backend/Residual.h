@@ -23,8 +23,10 @@ public:
     using VectorFrameDim = Eigen::Matrix<SCALAR,FRAME_DIM,1>;
     using VectorPointDim = Eigen::Matrix<SCALAR,POINT_DIM,1>;
     using ResData = Eigen::Matrix<SCALAR,RES_DIM,1>;
-    virtual void initApplyDataToPoint(HessionBase_t *hessionBase) = 0;
-    virtual void computeRes(){assert(false && "computeRes isnot implemented");};
-    virtual void computeJ(){assert(false && "computeJ isnot implemented");};
+
+    virtual SCALAR asScalar() const {assert(false && "computeRes isnot implemented");
+        return 0.0;};
+    virtual void applyDataToPoint(HessionBase_t *hessionBase) = 0;
+    virtual void computeRes(){assert(false && "computeRes isnot implemented");}
 
 };

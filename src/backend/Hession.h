@@ -13,7 +13,7 @@ public:
     using Point_t =  Point<RES_DIM, FRAME_DIM, WINDOW_SIZE_MAX, POINT_DIM, SCALAR>;
     using Camera_t =  Camera<RES_DIM, FRAME_DIM, WINDOW_SIZE_MAX, POINT_DIM, SCALAR>;
     // 当一个残差项进入系统时该做什么，主要是将信息添加到B中，（H的左上角）
-    virtual void initapplyRes(ResidualBase_t *residual) = 0;
+    virtual void applyRes(ResidualBase_t *residual) = 0;
     // 清空marginlize相关数据结构
     virtual void clearMargedInfo() = 0;
     // 边缘化掉一个点,主要涉及到对marginlize相关数据结构的更新

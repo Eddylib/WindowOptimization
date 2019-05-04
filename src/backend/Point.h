@@ -16,6 +16,7 @@ typedef enum StateE{
 }Status;
 template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>
 class Point{
+    double *datahog;
 public:
     int id{};
     typedef Camera<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR> Camera_t;
@@ -23,7 +24,7 @@ public:
 //    Camera_t *host;
     using PointState = Eigen::Matrix<SCALAR,POINT_DIM,1>;
     Point(int _id);
-    Point(int _id,PointState state);
+    Point(int _id, double *data);
     std::vector<Residual_t*> residuals;
     ~Point();
     int getId(){return id;}
@@ -38,9 +39,6 @@ public:
             return *Eik[i];
         }
     }
-//    void setEik(int i, const Mat& data){
-//        Eik[i] = data;
-//    }
     void addEik(int i, const Eigen::Matrix<SCALAR,FRAME_DIM,POINT_DIM> & data){
         if(Eik[i] == nullptr){
             Eik[i] = new Eigen::Matrix<SCALAR,FRAME_DIM,POINT_DIM>(zero);
@@ -63,13 +61,40 @@ public:
     }
     const static Eigen::Matrix<SCALAR,FRAME_DIM,POINT_DIM> zero;
     const PointState &getPointState()const{return pointState;}
+    void getDelta(const Mat &camDelta){
+        Eigen::Matrix<SCALAR,POINT_DIM,1> EikCamDelta;
+        int camNum = camDelta.rows()/FRAME_DIM;
+        for (int i = 0; i < camNum; ++i) {
+            if(Eik[i]){
+                EikCamDelta+=Eik[i]->transpose()*camDelta.block(i*FRAME_DIM,0,FRAME_DIM,1);
+            }
+        }
+        delta = C.inverse()*(-jp_r-EikCamDelta);
+    }
+    void applyDelta(double lr){
+        pointState += lr*delta ;
+        if(datahog){
+            Eigen::Map<PointState> publish(datahog);publish = pointState;
+        }
+    }
+    void clearStepInfo(){
+        C.setIdentity();
+        C*=99999;
+        for (int i = 0; i < Eik.size(); ++i) {
+            if(Eik[i]){
+                delete(Eik[i]);
+            }
+            Eik[i] = nullptr;
+        }
+        jp_r.setZero();
+    }
 private:
     std::vector<Eigen::Matrix<SCALAR,FRAME_DIM,POINT_DIM> *> Eik;
     Eigen::Matrix<SCALAR,POINT_DIM,POINT_DIM> C;
     PointState jp_r;
     PointState prior;
     PointState pointState;
-//    Vector delta;
+    Vector delta;
     Status status;
 
 ////前端数据结构
@@ -92,36 +117,34 @@ Point<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>::~Point(){
     }
     for (int i = 0; i < WINDOW_SIZE_MAX; ++i) {
         delete Eik[i];
+        Eik[i] = nullptr;
     }
 }
 template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>
 int Point<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>::hasResidualWithTarget(int camId) {
-//    int ret = 0;
-//    for (int i = 0; i < residuals.size(); ++i) {
-////        if(residuals[i]->getTarget()->getid() == camId){
-//        if(residuals[i]->getTarget()->getid() == camId){
-//            ret = 1;
-//            break;
-//        }
-//    }
     return Eik[camId] != nullptr;
 }
 
 template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>
-Point<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>::Point(int _id):Point(_id, PointState()){
+Point<RES_DIM,FRAME_DIM,WINDOW_SIZE_MAX,POINT_DIM,SCALAR>::Point(int _id):Point(_id,nullptr){
 }
 
 template<int RES_DIM, int FRAME_DIM, int WINDOW_SIZE_MAX, int POINT_DIM, typename SCALAR>
 Point<RES_DIM, FRAME_DIM, WINDOW_SIZE_MAX, POINT_DIM, SCALAR>::Point(
-        int _id,
-        PointState state):id(_id),prior(state),pointState(state){
+        int _id, double *data):id(_id),datahog(data){
 //    for (int i = 0; i < WINDOW_SIZE_MAX; ++i) {
 ////        auto *tmp = new Eigen::Matrix<SCALAR,FRAME_DIM,POINT_DIM>();
 ////        tmp->setZero();
+
 //        Eik.push_back(nullptr);
 //    }
+    if(data){
+        pointState = PointState(data);
+        prior = pointState;
+    }
     Eik.resize(WINDOW_SIZE_MAX, nullptr);
-    C.setZero();
+    C.setIdentity();
+    C*=99999;
     jp_r.setZero();
     status=ACTIVED;
 }
