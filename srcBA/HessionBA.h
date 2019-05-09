@@ -70,7 +70,7 @@ public:
             for (int l = 0; l < camSize; ++l) {
                 if(point->ifHasEik(k) && point->ifHasEik(l))
                     addCamBlock(k,l,
-                            point->getEik(k)
+                            -point->getEik(k)
                             * point->getC().inverse()
                             * point->getEik(l).transpose());
             }

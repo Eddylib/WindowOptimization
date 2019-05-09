@@ -4,7 +4,7 @@
 #pragma once
 
 #include <iostream>
-#include <eigen3/Eigen/Dense>
+#include <Eigen/Dense>
 #include "../alg_config.h"
 #include "../alg_utils.h"
 #include "Camera.h"
@@ -42,6 +42,9 @@ public:
     void addEik(int i, const Eigen::Matrix<SCALAR,FRAME_DIM,POINT_DIM> & data){
         if(Eik[i] == nullptr){
             Eik[i] = new Eigen::Matrix<SCALAR,FRAME_DIM,POINT_DIM>(zero);
+        }else{
+            dbcout<<"error, unexpected add"<<std::endl;
+            exit(-1);
         }
         *Eik[i] += data;
     }

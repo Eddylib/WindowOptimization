@@ -5,4 +5,4 @@
 #include "Camera.h"
 #include "Point.h"
 #include "Residual.h"
-#include <eigen3/unsupported/Eigen/MatrixFunctions>
+#include <unsupported/Eigen/MatrixFunctions>

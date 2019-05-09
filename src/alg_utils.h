@@ -8,7 +8,7 @@
 #ifdef BUILD_FROUNT
 #include <opencv2/core.hpp>
 #endif
-#include <eigen3/Eigen/Dense>
+#include <Eigen/Dense>
 #include "alg_config.h"
 
 typedef Eigen::MatrixXd Mat;

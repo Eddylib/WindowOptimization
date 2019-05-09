@@ -74,7 +74,7 @@ void do_ba(WindowOptimizor_t &windowOptimizor, BALProblem &balProblem){
 #endif
         }
         cout<<"step curr residual "<<curr_res<<", min res "<<min_res<<endl;
-        windowOptimizor.step_once(delta,true,true,true,true,log(i+1.0));
+        windowOptimizor.step_once(delta,true,true,true,true,sqrt(i+1.0));
         //min res: 8.37132e+06-->3.96172e+05 残差减小20倍
     }
 }

@@ -6,7 +6,7 @@
 #include <random>
 #include <memory>
 #include <iostream>
-#include <eigen3/unsupported/Eigen/MatrixFunctions>
+#include <unsupported/Eigen/MatrixFunctions>
 #include "../../utils.h"
 
 #include "Camera.h"
